@@ -1,147 +1,108 @@
 // ============================================
 // ARCHIVO: /src/components/ProductForm.tsx
 // ============================================
-import React, { useState, useRef, useEffect } from "react";
-import { Product } from "../types";
+import React, { useState } from 'react';
+import { Product } from '../types';
 
 interface ProductFormProps {
-  product?: Product;
-  onSubmit: (product: Omit<Product, "id">) => Promise<void>;
+  onSubmit: (product: Omit<Product, 'id'>) => void;
   onCancel: () => void;
 }
 
-export const ProductForm: React.FC<ProductFormProps> = ({
-  product,
-  onSubmit,
-  onCancel,
+export const ProductForm: React.FC<ProductFormProps> = ({ 
+  onSubmit, 
+  onCancel 
 }) => {
   const [formData, setFormData] = useState({
-    title: product?.title || "",
-    price: product?.price || 0,
-    description: product?.description || "",
-    category: product?.category || "",
-    image: product?.image || "",
+    title: '',
+    price: 0,
+    description: '',
+    category: '',
+    image: 'https://via.placeholder.com/200'
   });
+  
+  const [formError, setFormError] = useState('');
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const titleInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    // Focus automático en el título al montar
-    titleInputRef.current?.focus();
-  }, []);
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [name]: name === "price" ? parseFloat(value) || 0 : value,
+      [name]: name === 'price' ? parseFloat(value) || 0 : value
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validación básica
-    if (!formData.title.trim() || formData.price <= 0) {
-      setError("Título y precio son obligatorios");
+    
+    // Validación
+    if (!formData.title.trim()) {
+      setFormError('El título es obligatorio');
+      return;
+    }
+    
+    if (formData.price <= 0) {
+      setFormError('El precio debe ser mayor a 0');
       return;
     }
 
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      await onSubmit(formData);
-      onCancel(); // Cerrar modal después de éxito
-    } catch (err) {
-      setError("Error al guardar el producto");
-    } finally {
-      setIsSubmitting(false);
-    }
+    setFormError('');
+    onSubmit(formData);
   };
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h2>{product ? "Editar Producto" : "Crear Producto"}</h2>
-
+        <h2>Crear Producto</h2>
+        
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="title">Título *</label>
-            <input
-              ref={titleInputRef}
-              id="title"
-              name="title"
+            <label>Título *</label>
+            <input 
               type="text"
+              name="title"
               value={formData.title}
               onChange={handleChange}
-              required
+              placeholder="Nombre del producto"
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="price">Precio *</label>
-            <input
-              id="price"
-              name="price"
+            <label>Precio *</label>
+            <input 
               type="number"
+              name="price"
               step="0.01"
               min="0"
               value={formData.price}
               onChange={handleChange}
-              required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="description">Descripción</label>
-            <textarea
-              id="description"
+            <label>Descripción (opcional)</label>
+            <input 
+              type="text"
               name="description"
               value={formData.description}
               onChange={handleChange}
-              rows={4}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="category">Categoría</label>
-            <input
-              id="category"
-              name="category"
+            <label>Categoría (opcional)</label>
+            <input 
               type="text"
+              name="category"
               value={formData.category}
               onChange={handleChange}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="image">URL de imagen</label>
-            <input
-              id="image"
-              name="image"
-              type="url"
-              value={formData.image}
-              onChange={handleChange}
-            />
-          </div>
-
-          {error && <p className="form-error">{error}</p>}
+          {formError && <p className="form-error">{formError}</p>}
 
           <div className="form-actions">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn-primary"
-            >
-              {isSubmitting ? "Guardando..." : product ? "Actualizar" : "Crear"}
-            </button>
-            <button type="button" onClick={onCancel} className="btn-secondary">
+            <button type="submit">Crear</button>
+            <button type="button" onClick={onCancel}>
               Cancelar
             </button>
           </div>

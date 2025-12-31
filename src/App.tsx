@@ -1,113 +1,125 @@
 // ============================================
 // ARCHIVO: /src/App.tsx
 // ============================================
-import React, { useState, useCallback } from "react";
-import { CartProvider, useCart } from "./context/CartContext";
-import { SearchBar } from "./components/SearchBar";
-import { ProductList } from "./components/ProductList";
-import { Pagination } from "./components/Pagination";
-import { ProductForm } from "./components/ProductForm";
-import { useProducts } from "./hooks/useProducts";
-import { createProduct, updateProduct, deleteProduct } from "./services/api";
-import { Product } from "./types";
-import "./App.css";
+import React, { useState, useEffect } from 'react';
+import { Product } from './types';
+import { ProductList } from './components/ProductList';
+import { ProductForm } from './components/ProductForm';
+import { Pagination } from './components/Pagination';
+import './App.css';
 
-function AppContent() {
-  const {
-    products,
-    loading,
-    error,
-    setSearchQuery,
-    currentPage,
-    setCurrentPage,
-    totalPages,
-    addProduct,
-    updateProductInList,
-    deleteProductFromList,
-  } = useProducts();
+const API_URL = 'https://fakestoreapi.com/products';
+const PRODUCTS_PER_PAGE = 6;
 
-  const { totalItems } = useCart();
-
+function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | undefined>();
-  const [notification, setNotification] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const showNotification = useCallback((message: string) => {
-    setNotification(message);
-    setTimeout(() => setNotification(null), 3000);
+  // NIVEL 1: Fetch inicial de productos
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch(API_URL);
+        
+        if (!response.ok) {
+          throw new Error('Error al cargar productos');
+        }
+        
+        const data: Product[] = await response.json();
+        setProducts(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error desconocido');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
   }, []);
 
-  const handleCreateProduct = async (productData: Omit<Product, "id">) => {
+  // NIVEL 2: Debounce para búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      setCurrentPage(1); // Reset página al buscar
+    }, 500);
+
+    // Cleanup: cancelar el timer anterior si searchQuery cambia
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // NIVEL 2: Función para crear producto
+  const handleCreateProduct = async (productData: Omit<Product, 'id'>) => {
     try {
-      const newProduct = await createProduct(productData);
-      addProduct(newProduct);
-      showNotification("✅ Producto creado exitosamente");
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al crear producto');
+      }
+
+      const newProduct: Product = await response.json();
+      
+      // Agregar al inicio de la lista
+      setProducts(prev => [newProduct, ...prev]);
+      setShowForm(false);
+      
+      alert('✅ Producto creado exitosamente');
     } catch (err) {
-      showNotification("❌ Error al crear producto");
-      throw err;
+      alert('❌ Error al crear producto');
+      console.error(err);
     }
   };
 
-  const handleUpdateProduct = async (productData: Omit<Product, "id">) => {
-    if (!editingProduct) return;
+  // Filtrado de productos
+  const filteredProducts = products.filter(product =>
+    product.title.toLowerCase().includes(debouncedQuery.toLowerCase())
+  );
 
-    try {
-      const updated = await updateProduct(editingProduct.id, productData);
-      updateProductInList(editingProduct.id, updated);
-      showNotification("✅ Producto actualizado exitosamente");
-    } catch (err) {
-      showNotification("❌ Error al actualizar producto");
-      throw err;
-    }
-  };
-
-  const handleDeleteProduct = async (id: number) => {
-    try {
-      await deleteProduct(id);
-      deleteProductFromList(id);
-      showNotification("✅ Producto eliminado exitosamente");
-    } catch (err) {
-      showNotification("❌ Error al eliminar producto");
-      throw err;
-    }
-  };
-
-  const openCreateModal = () => {
-    setEditingProduct(undefined);
-    setShowForm(true);
-  };
-
-  const openEditModal = (product: Product) => {
-    setEditingProduct(product);
-    setShowForm(true);
-  };
-
-  const closeModal = () => {
-    setShowForm(false);
-    setEditingProduct(undefined);
-  };
+  // NIVEL 3 (BONUS): Paginación
+  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const endIndex = startIndex + PRODUCTS_PER_PAGE;
+  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
   return (
     <div className="App">
       <header>
-        <h1>🛍️ Dashboard de Productos</h1>
-        <div className="cart-badge">🛒 Carrito: {totalItems} items</div>
+        <h1>🛍️ Catálogo de Productos</h1>
       </header>
 
       <div className="controls">
-        <SearchBar onSearch={setSearchQuery} />
-        <button onClick={openCreateModal} className="btn-create">
+        <input
+          type="text"
+          placeholder="Buscar productos..."
+          className="search-input"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+
+        <button onClick={() => setShowForm(true)} className="btn-create">
           ➕ Crear Producto
         </button>
       </div>
 
       <main>
         <ProductList
-          products={products}
+          products={paginatedProducts}
           loading={loading}
           error={error}
-          onEdit={openEditModal}
-          onDelete={handleDeleteProduct}
         />
 
         <Pagination
@@ -119,23 +131,13 @@ function AppContent() {
 
       {showForm && (
         <ProductForm
-          product={editingProduct}
-          onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
-          onCancel={closeModal}
+          onSubmit={handleCreateProduct}
+          onCancel={() => setShowForm(false)}
         />
       )}
-
-      {notification && <div className="notification">{notification}</div>}
     </div>
   );
 }
 
-function App() {
-  return (
-    <CartProvider>
-      <AppContent />
-    </CartProvider>
-  );
-}
-
 export default App;
+

@@ -13,13 +13,3 @@ export interface Product {
     count: number;
   };
 }
-
-export interface CartItem {
-  product: Product;
-  quantity: number;
-}
-
-export interface APIResponse<T> {
-  data: T;
-  error?: string;
-}
